@@ -8,7 +8,7 @@ from collections import defaultdict
 from sklearn import svm
 
 
-PRIMELE_N_CUVINTE = 1000
+PRIMELE_N_CUVINTE = 5000
 
 
 def accuracy(y, p):
@@ -46,16 +46,20 @@ dir_path = './date_proiect/'
 labels = np.loadtxt(os.path.join(dir_path, 'labels_train.txt'))
 
 train_data_path = os.path.join(dir_path, 'train')
-iduri_train, data = citeste_texte_din_director(train_data_path)
+iduri_train, train_data = citeste_texte_din_director(train_data_path) #train_data era data
 
 
-print(data[0][:10])
+print(train_data[0][:10]) ##train_data era data
 ### citim datele ###
 
+### mada
+test_data_path = os.path.join(dir_path, "test")
+iduri_test, test_data = citeste_texte_din_director(test_data_path)
+### mada
 
-### numaram cuvintele din toate documentele ###
+### numaram cuvintele din toate documentele ###                       #nu stiu daca trebuie sa numaram si din test
 contor_cuvinte = defaultdict(int)
-for doc in data:
+for doc in train_data: #train_data era data
     for word in doc:
         contor_cuvinte[word] += 1
 
@@ -112,30 +116,34 @@ def get_bow_pe_corpus(corpus, lista):
         bow[idx] = v
     return bow
 
-data_bow = get_bow_pe_corpus(data, list_of_selected_words)
+
+data = train_data + test_data
+data_bow = get_bow_pe_corpus(data, list_of_selected_words) #train_data era data
 print ("Data bow are shape: ", data_bow.shape)
 
-nr_exemple_train = 2000
+nr_exemple_train = 2483 #inainte era 2000
 nr_exemple_valid = 500
-nr_exemple_test = len(data) - (nr_exemple_train + nr_exemple_valid)
+# nr_exemple_test = len(data) - (nr_exemple_train + nr_exemple_valid)
+nr_exemple_test = 1497
 
 indici_train = np.arange(0, nr_exemple_train)
 indici_valid = np.arange(nr_exemple_train, nr_exemple_train + nr_exemple_valid)
 indici_test = np.arange(nr_exemple_train + nr_exemple_valid, len(data))
+print("indici_test: ", indici_test)
 
 print ("Histograma cu clasele din train: ", np.histogram(labels[indici_train])[0])
 print ("Histograma cu clasele din validation: ", np.histogram(labels[indici_valid])[0])
-print ("Histograma cu clasele din test: ", np.histogram(labels[indici_test])[0])
+# print ("Histograma cu clasele din test: ", np.histogram(labels[indici_test])[0])
 # clasele sunt balansate in cazul asta pentru train, valid si nr_exemple_test
 
 
 # cu cat creste C, cu atat clasificatorul este mai predispus sa faca overfit
 # https://stats.stackexchange.com/questions/31066/what-is-the-influence-of-c-in-svms-with-linear-kernel
 for C in [0.001, 0.01, 0.1, 1, 10, 100]:
-    clasificator = svm.SVC(C = C, kernel = 'linear')
-    clasificator.fit(data_bow[indici_train, :], labels[indici_train])
-    predictii = clasificator.predict(data_bow[indici_valid, :])
-    print ("Acuratete pe validare cu C =", C, ": ", accuracy(predictii, labels[indici_valid]))
+     clasificator = svm.SVC(C = C, kernel = 'linear')
+     clasificator.fit(data_bow[indici_train, :], labels[indici_train])
+     predictii = clasificator.predict(data_bow[indici_valid, :])
+     print ("Acuratete pe validare cu C =", C, ": ", accuracy(predictii, labels[indici_valid]))
 
 
 # concatenam indicii de train si validare
@@ -144,14 +152,14 @@ indici_train_valid = np.concatenate([indici_train, indici_valid])
 clasificator = svm.SVC(C = 10, kernel = 'linear')
 clasificator.fit(data_bow[indici_train_valid, :], labels[indici_train_valid])
 predictii = clasificator.predict(data_bow[indici_test])
-print ("Acuratete pe test cu C = 10: ", accuracy(predictii, labels[indici_test]))
+# print ("Acuratete pe test cu C = 10: ", accuracy(predictii, labels[indici_test]))
 
 
 def scrie_fisier_submission(nume_fisier, predictii, iduri):
     with open(nume_fisier, 'w') as fout:
         fout.write("Id,Prediction\n")
         for id_text, pred in zip(iduri, predictii):
-            fout.write(str(id_text) + ',' + str(int(pred)) + '\n')
+            fout.write(str(id_text + 1) + ',' + str(int(pred)) + '\n')
 
 
 
