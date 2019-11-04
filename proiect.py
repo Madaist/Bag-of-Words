@@ -8,7 +8,7 @@ from collections import defaultdict
 from sklearn import svm
 
 
-PRIMELE_N_CUVINTE = 5000
+PRIMELE_N_CUVINTE = 10000
 
 
 def accuracy(y, p):
