@@ -128,7 +128,7 @@ data_bow_train = get_bow_pe_corpus(train_data, list_of_selected_words)
 data_bow_test = get_bow_pe_corpus(test_data, list_of_selected_words)
 print("Data bow are shape: ", data_bow_train.shape)
 
-nr_exemple_train = 2000
+nr_exemple_train = 2300
 nr_exemple_valid = 500
 nr_exemple_test = len(train_data) - (nr_exemple_train + nr_exemple_valid)
 nr_exemple_test_final = 1497
@@ -137,6 +137,7 @@ indici_train = np.arange(0, nr_exemple_train)  # np.array cu valorile [0, 1, 2..
 indici_valid = np.arange(nr_exemple_train, nr_exemple_train + nr_exemple_valid)
 indici_test = np.arange(nr_exemple_train + nr_exemple_valid, len(train_data))
 indici_test_final = np.arange(nr_exemple_train + nr_exemple_valid + nr_exemple_test, len(train_data + test_data))  # [2983 .... 4479]
+print("indici test final: ", indici_test_final)
 
 print("Histograma cu clasele din train: ", np.histogram(labels[indici_train])[0])
 print("Histograma cu clasele din validation: ", np.histogram(labels[indici_valid])[0])
@@ -148,10 +149,10 @@ print ("Histograma cu clasele din test: ", np.histogram(labels[indici_test])[0])
 # https://stats.stackexchange.com/questions/31066/what-is-the-influence-of-c-in-svms-with-linear-kernel
 
 for C in [0.001, 0.01, 0.1, 1, 10, 100]:
-    # clasificator = svm.SVC(C = C, kernel = 'linear')  # definirea modelului ONE VERSUS ONE
+   # clasificator = svm.SVC(C = C, kernel = 'linear')  # definirea modelului ONE VERSUS ONE
     clasificator = svm.LinearSVC(C = C, max_iter=2983)   # definirea modelului ONE VERSUS ALL
     clasificator.fit(data_bow_train[indici_train, :], labels[indici_train])  # antrenarea modelului
-    # fit o sa modifice in clasificator ca sa afle a si b de la ecuatia dreptei
+# fit o sa modifice in clasificator ca sa afle a si b de la ecuatia dreptei
     predictii = clasificator.predict(data_bow_train[indici_valid, :])  # predictiile modelului
     print("Acuratete pe validare cu C =", C, ": ", accuracy(predictii, labels[indici_valid]))
 
@@ -159,17 +160,19 @@ for C in [0.001, 0.01, 0.1, 1, 10, 100]:
 # concatenam indicii de train si validare
 # incercati diferite valori pentru C si testati pe datele de test
 indici_train_valid = np.concatenate([indici_train, indici_valid])
-clasificator = svm.SVC(C = 1, kernel = 'linear')
-# clasificator = svm.LinearSVC()
+# clasificator = svm.SVC(C = 1, kernel = 'linear')
+clasificator = svm.LinearSVC()
 clasificator.fit(data_bow_train[indici_train_valid, :], labels[indici_train_valid])
 predictii = clasificator.predict(data_bow_train[indici_test])
-# print ("Acuratete pe test cu C = 10: ", accuracy(predictii, labels[indici_test]))
+print("Acuratete pe test cu C = 1 : ", accuracy(predictii, labels[indici_test]))
+
 
 
 ### test final ###
-clasificatorSVM = svm.SVC(C = 1, kernel = 'linear')
-clasificatorSVM.fit(data_bow_train, labels)
-predictii_finale = clasificatorSVM.predict(data_bow_test)
+#clasificator = svm.SVC(C = 1, kernel = 'linear')
+clasificator = svm.LinearSVC()
+clasificator.fit(data_bow_train, labels)
+predictii_finale = clasificator.predict(data_bow_test)
 
 
 def scrie_fisier_submission(nume_fisier, predictii, iduri):
