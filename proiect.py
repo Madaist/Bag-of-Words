@@ -21,6 +21,7 @@ def files_in_folder(mypath):
             fisiere.append(os.path.join(mypath, f))
     return sorted(fisiere)
 
+
 def extrage_fisier_fara_extensie(cale_catre_fisier):
     nume_fisier = os.path.basename(cale_catre_fisier)
     nume_fisier_fara_extensie = nume_fisier.replace('.txt', '')
@@ -37,39 +38,41 @@ def citeste_texte_din_director(cale):
 
         # incercati cu si fara punctuatie sau cu lowercase
         text_fara_punct = re.sub("[-.,;:!?\"\'\/()_*=`]", "", text)
-        cuvinte_text = text_fara_punct.split()
-        date_text.append(cuvinte_text)
-    return (iduri_text, date_text)
+        # re - regular expresion; sub - substitute # inlocuieste caracterele din [] cu ""
+        cuvinte_text = text.split()  # split - imparte dupa whitespace si da o lista de cuvinte
+        date_text.append(cuvinte_text)  # date_text contine o lista de liste de cuvinte
+    return iduri_text, date_text
 
 ### citim datele ###
 dir_path = './date_proiect/'
 labels = np.loadtxt(os.path.join(dir_path, 'labels_train.txt'))
 
 train_data_path = os.path.join(dir_path, 'train')
-iduri_train, train_data = citeste_texte_din_director(train_data_path) #train_data era data
+iduri_train, train_data = citeste_texte_din_director(train_data_path)
+# train_data este o lista de liste de cuvinte din fiecare fisier de train
 
-
-print(train_data[0][:10]) ##train_data era data
+print(train_data[0][:10])  # primele 10 cuvinte din primul text
 ### citim datele ###
 
-### mada
 test_data_path = os.path.join(dir_path, "test")
 iduri_test, test_data = citeste_texte_din_director(test_data_path)
-### mada
 
-### numaram cuvintele din toate documentele ###                       #nu stiu daca trebuie sa numaram si din test
+
+### numaram cuvintele din toate documentele ###
+# am numarat doar din train; daca numar si din test, nu se schimba nimic
 contor_cuvinte = defaultdict(int)
-for doc in train_data: #train_data era data
+
+for doc in train_data:
     for word in doc:
         contor_cuvinte[word] += 1
 
 # transformam dictionarul in lista de tupluri ['cuvant1', frecventa1, 'cuvant2': frecventa2]
-perechi_cuvinte_frecventa = list(contor_cuvinte.items())
+perechi_cuvinte_frecventa = list(contor_cuvinte.items())  # [('cuvant1', 150), ('cuvant2', 500), ('cuvant3', 10)]
 
 # sortam descrescator lista de tupluri dupa frecventa
-perechi_cuvinte_frecventa = sorted(perechi_cuvinte_frecventa, key=lambda kv: kv[1], reverse=True)
+perechi_cuvinte_frecventa = sorted(perechi_cuvinte_frecventa, key=lambda kv: kv[1], reverse=True)  # [('cuvant2', 500), ('cuvant1', 150), ('cuvant3', 10)]
 
-# extragem primele 1000 cele mai frecvente cuvinte din toate textele
+# extragem primele 1000 cele mai frecvente cuvinte din toate textele (+ frecventele lor)
 perechi_cuvinte_frecventa = perechi_cuvinte_frecventa[0:PRIMELE_N_CUVINTE]
 
 print ("Primele 10 cele mai frecvente cuvinte ", perechi_cuvinte_frecventa[0:10])
@@ -77,25 +80,26 @@ print ("Primele 10 cele mai frecvente cuvinte ", perechi_cuvinte_frecventa[0:10]
 
 list_of_selected_words = []
 for cuvant, frecventa in perechi_cuvinte_frecventa:
-    list_of_selected_words.append(cuvant)
+    list_of_selected_words.append(cuvant)   # luam doar cuvintele, nu si frecventele
 ### numaram cuvintele din toate documentele ###
 
 
-def get_bow(text, lista_de_cuvinte):
+def get_bow(text, lista_de_cuvinte):  # face bag of words teste un singur text
     '''
     returneaza BoW corespunzator unui text impartit in cuvinte
     in functie de lista de cuvinte selectate
     '''
     contor = dict()
-    cuvinte = set(lista_de_cuvinte)
+    cuvinte = set(lista_de_cuvinte)  # luam cuvintele unice
     for cuvant in cuvinte:
-        contor[cuvant] = 0
+        contor[cuvant] = 0  # pentru fiecare cuvant unic din cele 1000, punem initial frecventa 0
     for cuvant in text:
         if cuvant in cuvinte:
-            contor[cuvant] += 1
-    return contor
+            contor[cuvant] += 1  # crestem frecventele cand e cazul
+    return contor  # returnam un dictionar cu cuvintele unice din cele 1000 si frecventele lor
 
-def get_bow_pe_corpus(corpus, lista):
+
+def get_bow_pe_corpus(corpus, lista):  # face bag of words pentru tot setul de date
     '''
     returneaza BoW normalizat
     corespunzator pentru un intreg set de texte
@@ -110,49 +114,62 @@ def get_bow_pe_corpus(corpus, lista):
             care contine valorile dictionarului
             trebuie convertit in lista apoi in numpy.array
         '''
-        v = np.array(list(bow_dict.values()))
+        v = np.array(list(bow_dict.values())) # in v avem frecventele
         # incercati si alte tipuri de normalizari
         # v = v / np.sqrt(np.sum(v ** 2))
+        # v = v / np.sum(v)
         bow[idx] = v
-    return bow
+    return bow  # va returna o matrice cu 4480 de linii si 10.000 de coloane.
+    # pe fiecare linie avem frecventele corespunzatoare celor 1000 de cuvinte, din cele 4480 de texte
 
 
 data = train_data + test_data
-data_bow = get_bow_pe_corpus(data, list_of_selected_words) #train_data era data
-print ("Data bow are shape: ", data_bow.shape)
+data_bow_train = get_bow_pe_corpus(train_data, list_of_selected_words)
+data_bow_test = get_bow_pe_corpus(test_data, list_of_selected_words)
+print("Data bow are shape: ", data_bow_train.shape)
 
-nr_exemple_train = 2483 #inainte era 2000
+nr_exemple_train = 2000
 nr_exemple_valid = 500
-# nr_exemple_test = len(data) - (nr_exemple_train + nr_exemple_valid)
-nr_exemple_test = 1497
+nr_exemple_test = len(train_data) - (nr_exemple_train + nr_exemple_valid)
+nr_exemple_test_final = 1497
 
-indici_train = np.arange(0, nr_exemple_train)
+indici_train = np.arange(0, nr_exemple_train)  # np.array cu valorile [0, 1, 2...2799]
 indici_valid = np.arange(nr_exemple_train, nr_exemple_train + nr_exemple_valid)
-indici_test = np.arange(nr_exemple_train + nr_exemple_valid, len(data))
-print("indici_test: ", indici_test)
+indici_test = np.arange(nr_exemple_train + nr_exemple_valid, len(train_data))
+indici_test_final = np.arange(nr_exemple_train + nr_exemple_valid + nr_exemple_test, len(train_data + test_data))  # [2983 .... 4479]
 
-print ("Histograma cu clasele din train: ", np.histogram(labels[indici_train])[0])
-print ("Histograma cu clasele din validation: ", np.histogram(labels[indici_valid])[0])
-# print ("Histograma cu clasele din test: ", np.histogram(labels[indici_test])[0])
+print("Histograma cu clasele din train: ", np.histogram(labels[indici_train])[0])
+print("Histograma cu clasele din validation: ", np.histogram(labels[indici_valid])[0])
+print ("Histograma cu clasele din test: ", np.histogram(labels[indici_test])[0])
 # clasele sunt balansate in cazul asta pentru train, valid si nr_exemple_test
 
 
 # cu cat creste C, cu atat clasificatorul este mai predispus sa faca overfit
 # https://stats.stackexchange.com/questions/31066/what-is-the-influence-of-c-in-svms-with-linear-kernel
+
 for C in [0.001, 0.01, 0.1, 1, 10, 100]:
-     clasificator = svm.SVC(C = C, kernel = 'linear')
-     clasificator.fit(data_bow[indici_train, :], labels[indici_train])
-     predictii = clasificator.predict(data_bow[indici_valid, :])
-     print ("Acuratete pe validare cu C =", C, ": ", accuracy(predictii, labels[indici_valid]))
+    # clasificator = svm.SVC(C = C, kernel = 'linear')  # definirea modelului ONE VERSUS ONE
+    clasificator = svm.LinearSVC(C = C, max_iter=2983)   # definirea modelului ONE VERSUS ALL
+    clasificator.fit(data_bow_train[indici_train, :], labels[indici_train])  # antrenarea modelului
+    # fit o sa modifice in clasificator ca sa afle a si b de la ecuatia dreptei
+    predictii = clasificator.predict(data_bow_train[indici_valid, :])  # predictiile modelului
+    print("Acuratete pe validare cu C =", C, ": ", accuracy(predictii, labels[indici_valid]))
 
 
 # concatenam indicii de train si validare
 # incercati diferite valori pentru C si testati pe datele de test
 indici_train_valid = np.concatenate([indici_train, indici_valid])
-clasificator = svm.SVC(C = 10, kernel = 'linear')
-clasificator.fit(data_bow[indici_train_valid, :], labels[indici_train_valid])
-predictii = clasificator.predict(data_bow[indici_test])
+clasificator = svm.SVC(C = 1, kernel = 'linear')
+# clasificator = svm.LinearSVC()
+clasificator.fit(data_bow_train[indici_train_valid, :], labels[indici_train_valid])
+predictii = clasificator.predict(data_bow_train[indici_test])
 # print ("Acuratete pe test cu C = 10: ", accuracy(predictii, labels[indici_test]))
+
+
+### test final ###
+clasificatorSVM = svm.SVC(C = 1, kernel = 'linear')
+clasificatorSVM.fit(data_bow_train, labels)
+predictii_finale = clasificatorSVM.predict(data_bow_test)
 
 
 def scrie_fisier_submission(nume_fisier, predictii, iduri):
@@ -163,7 +180,7 @@ def scrie_fisier_submission(nume_fisier, predictii, iduri):
 
 
 
-scrie_fisier_submission("submisie_C10.csv", predictii, indici_test)
+scrie_fisier_submission("submisie_C10.csv", predictii_finale, indici_test_final)
 
 '''
 TODO pentru a face un submission pe kaggle:
