@@ -6,13 +6,16 @@ import re
 import os
 from collections import defaultdict
 from sklearn import svm
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.naive_bayes import GaussianNB
 
 
 PRIMELE_N_CUVINTE = 10000
 
 
 def accuracy(y, p):
-    return 100 * (y==p).astype('int').mean()
+    return 100 * (y == p).astype('int').mean()
+
 
 def files_in_folder(mypath):
     fisiere = []
@@ -26,6 +29,7 @@ def extrage_fisier_fara_extensie(cale_catre_fisier):
     nume_fisier = os.path.basename(cale_catre_fisier)
     nume_fisier_fara_extensie = nume_fisier.replace('.txt', '')
     return nume_fisier_fara_extensie
+
 
 def citeste_texte_din_director(cale):
     date_text = []
@@ -42,6 +46,7 @@ def citeste_texte_din_director(cale):
         cuvinte_text = text.split()  # split - imparte dupa whitespace si da o lista de cuvinte
         date_text.append(cuvinte_text)  # date_text contine o lista de liste de cuvinte
     return iduri_text, date_text
+
 
 ### citim datele ###
 dir_path = './date_proiect/'
@@ -75,7 +80,7 @@ perechi_cuvinte_frecventa = sorted(perechi_cuvinte_frecventa, key=lambda kv: kv[
 # extragem primele 1000 cele mai frecvente cuvinte din toate textele (+ frecventele lor)
 perechi_cuvinte_frecventa = perechi_cuvinte_frecventa[0:PRIMELE_N_CUVINTE]
 
-print ("Primele 10 cele mai frecvente cuvinte ", perechi_cuvinte_frecventa[0:10])
+print("Primele 10 cele mai frecvente cuvinte ", perechi_cuvinte_frecventa[0:10])
 
 
 list_of_selected_words = []
@@ -123,13 +128,13 @@ def get_bow_pe_corpus(corpus, lista):  # face bag of words pentru tot setul de d
     # pe fiecare linie avem frecventele corespunzatoare celor 1000 de cuvinte, din cele 4480 de texte
 
 
-data = train_data + test_data
+#data = train_data + test_data
 data_bow_train = get_bow_pe_corpus(train_data, list_of_selected_words)
 data_bow_test = get_bow_pe_corpus(test_data, list_of_selected_words)
 print("Data bow are shape: ", data_bow_train.shape)
 
-nr_exemple_train = 2300
-nr_exemple_valid = 500
+nr_exemple_train = 2600
+nr_exemple_valid = 100
 nr_exemple_test = len(train_data) - (nr_exemple_train + nr_exemple_valid)
 nr_exemple_test_final = 1497
 
@@ -148,29 +153,28 @@ print ("Histograma cu clasele din test: ", np.histogram(labels[indici_test])[0])
 # cu cat creste C, cu atat clasificatorul este mai predispus sa faca overfit
 # https://stats.stackexchange.com/questions/31066/what-is-the-influence-of-c-in-svms-with-linear-kernel
 
-for C in [0.001, 0.01, 0.1, 1, 10, 100]:
-   # clasificator = svm.SVC(C = C, kernel = 'linear')  # definirea modelului ONE VERSUS ONE
-    clasificator = svm.LinearSVC(C = C, max_iter=2983)   # definirea modelului ONE VERSUS ALL
+for C in [0.01, 0.1, 1, 10]:
+    # clasificator = svm.SVC(C = C, kernel = 'linear')  # definirea modelului ONE VERSUS ONE
+    clasificator = svm.LinearSVC(C = C, dual = False, max_iter=2983)   # definirea modelului ONE VERSUS ALL
     clasificator.fit(data_bow_train[indici_train, :], labels[indici_train])  # antrenarea modelului
-# fit o sa modifice in clasificator ca sa afle a si b de la ecuatia dreptei
+    # fit o sa modifice in clasificator ca sa afle a si b de la ecuatia dreptei
     predictii = clasificator.predict(data_bow_train[indici_valid, :])  # predictiile modelului
     print("Acuratete pe validare cu C =", C, ": ", accuracy(predictii, labels[indici_valid]))
-
 
 # concatenam indicii de train si validare
 # incercati diferite valori pentru C si testati pe datele de test
 indici_train_valid = np.concatenate([indici_train, indici_valid])
 # clasificator = svm.SVC(C = 1, kernel = 'linear')
-clasificator = svm.LinearSVC()
+clasificator = svm.LinearSVC(C = 0.1, dual = False, max_iter=2983)
 clasificator.fit(data_bow_train[indici_train_valid, :], labels[indici_train_valid])
 predictii = clasificator.predict(data_bow_train[indici_test])
-print("Acuratete pe test cu C = 1 : ", accuracy(predictii, labels[indici_test]))
+print("Acuratete pe test cu C = 0.1 : ", accuracy(predictii, labels[indici_test]))
 
 
 
 ### test final ###
 #clasificator = svm.SVC(C = 1, kernel = 'linear')
-clasificator = svm.LinearSVC()
+# clasificator = svm.LinearSVC()
 clasificator.fit(data_bow_train, labels)
 predictii_finale = clasificator.predict(data_bow_test)
 
@@ -182,8 +186,8 @@ def scrie_fisier_submission(nume_fisier, predictii, iduri):
             fout.write(str(id_text + 1) + ',' + str(int(pred)) + '\n')
 
 
-
 scrie_fisier_submission("submisie_C10.csv", predictii_finale, indici_test_final)
+
 
 '''
 TODO pentru a face un submission pe kaggle:
@@ -196,4 +200,35 @@ TODO pentru a face un submission pe kaggle:
     7) citesc cu atentie cerinta proiectului (!!! trebuie si un pdf cu detalii)
 '''
 
+'''
+neigh = KNeighborsClassifier(n_neighbors=7)
+neigh.fit(data_bow_train[indici_train, :], labels[indici_train])
+predictii = neigh.predict(data_bow_train[indici_valid, :])
+print("Acuratete pe validare cu knn, k = 7: ", accuracy(predictii, labels[indici_valid]))
 
+# concatenam indicii de train si validare
+indici_train_valid = np.concatenate([indici_train, indici_valid])
+neigh.fit(data_bow_train[indici_train_valid, :], labels[indici_train_valid])
+predictii = neigh.predict(data_bow_train[indici_test])
+print("Acuratete pe test cu knn, k = 7 : ", accuracy(predictii, labels[indici_test]))
+
+### test final ###
+neigh.fit(data_bow_train, labels)
+predictii_finale = neigh.predict(data_bow_test)
+'''
+'''
+gnb = GaussianNB()
+gnb.fit(data_bow_train[indici_train, :], labels[indici_train])
+predictii = gnb.predict(data_bow_train[indici_valid, :])
+print("Acuratete pe validare cu gnb: ", accuracy(predictii, labels[indici_valid]))
+
+# concatenam indicii de train si validare
+indici_train_valid = np.concatenate([indici_train, indici_valid])
+gnb.fit(data_bow_train[indici_train_valid, :], labels[indici_train_valid])
+predictii = gnb.predict(data_bow_train[indici_test])
+print("Acuratete pe test cu gnb: ", accuracy(predictii, labels[indici_test]))
+
+### test final ###
+gnb.fit(data_bow_train, labels)
+predictii_finale = gnb.predict(data_bow_test)
+'''
