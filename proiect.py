@@ -40,9 +40,7 @@ def citeste_texte_din_director(cale):
         iduri_text.append(id_fis)
         with open(fis, 'r', encoding='utf-8') as fin:
             text = fin.read()
-
-        # incercati cu si fara punctuatie sau cu lowercase
-        text_fara_punct = re.sub("[-.,;:!?\"\'\/()_*=`]", "", text)
+        # text_fara_punct = re.sub("[-.,;:!?\"\'\/()_*=`]", "", text)
         # re - regular expresion; sub - substitute # inlocuieste caracterele din [] cu ""
         cuvinte_text = text.split()  # split - imparte dupa whitespace si da o lista de cuvinte
         date_text.append(cuvinte_text)  # date_text contine o lista de liste de cuvinte
@@ -127,14 +125,20 @@ def get_bow_pe_corpus(corpus, lista):  # face bag of words pentru tot setul de d
     return bow  # va returna o matrice cu 4480 de linii si 10.000 de coloane.
     # pe fiecare linie avem frecventele corespunzatoare celor 1000 de cuvinte, din cele 4480 de texte
 
-'''
+
+def confusion_matrix(predictii, labels):
+    M = np.zeros((11, 11))
+    for pred, adevar in zip(np.array(predictii).astype(int), np.array(labels).astype(int)):
+        M[adevar, pred] += 1
+    return M
+
+
 def k_fold_cross_validation(data, k = 10, C = 0.1):
     # prepare cross validation
     kfold = KFold(k, True, 1)
     accuracies = []
     # enumerate splits
     for train, test in kfold.split(data):
-        # print('train: %s, test: %s' % (data[train], data[test]))
         train_fold = np.array(data)[train]
         test_fold = np.array(data)[test]
         data_bow_train_fold = get_bow_pe_corpus(train_fold, list_of_selected_words)
@@ -145,11 +149,14 @@ def k_fold_cross_validation(data, k = 10, C = 0.1):
         acc = accuracy(predictions, labels[test])
         accuracies.append(acc)
         print("Acuratete pe test fold cu C =", C, ": ", acc)
+        print("Matricea de confuzie: ")
+        M = confusion_matrix(predictions, labels[test])
+        print(M)
     return np.average(accuracies)
 
 
 print('Acuratetea medie in urma k-fold cross validation este ', k_fold_cross_validation(train_data))
-'''
+
 
 
 #data = train_data + test_data
@@ -199,7 +206,7 @@ for C in [0.01, 0.1, 1, 10]:
 
 ### test final ###
 #clasificator = svm.SVC(C = 1, kernel = 'linear')
-clasificator = svm.LinearSVC(C = 1,  dual = False, max_iter=2983)
+clasificator = svm.LinearSVC(C = 1,  dual = False, max_iter=2983)  # 1 - 88%, 0.1 - 87%
 clasificator.fit(data_bow_train, labels)
 predictii_finale = clasificator.predict(data_bow_test)
 
@@ -260,19 +267,4 @@ predictii_finale = gnb.predict(data_bow_test)
 '''
 
 
-'''
-cea_mai_buna = 'k = 3, distanta = l2'
-M = np.zeros((10, 10))  # M - matricea de confuzie; initial este o matrice cu zero-uri, de dim 10*10
-for pred, adevar in zip(predictii[cea_mai_buna], test_labels):  # construire matrice de confuzie
-    M[adevar, pred] += 1
-print(np.bincount(test_labels))  # de cate ori a aparut fiecare test label
-print("MATRICEA DE CONFUZIE ESTE: ")
-print(M)
-'''
-
-def confusion_matrix(predictii, labels):
-    M = np.zeros(11, 11)
-    for pred, adevar in zip(predictii, labels):
-        M[adevar, pred] += 1
-    return M
 
