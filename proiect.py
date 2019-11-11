@@ -6,6 +6,7 @@ import re
 import os
 from collections import defaultdict
 from sklearn import svm
+from sklearn.model_selection import KFold
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.naive_bayes import GaussianNB
 
@@ -56,8 +57,7 @@ train_data_path = os.path.join(dir_path, 'train')
 iduri_train, train_data = citeste_texte_din_director(train_data_path)
 # train_data este o lista de liste de cuvinte din fiecare fisier de train
 
-print(train_data[0][:10])  # primele 10 cuvinte din primul text
-### citim datele ###
+# print(train_data[0][:10])  # primele 10 cuvinte din primul text
 
 test_data_path = os.path.join(dir_path, "test")
 iduri_test, test_data = citeste_texte_din_director(test_data_path)
@@ -80,7 +80,7 @@ perechi_cuvinte_frecventa = sorted(perechi_cuvinte_frecventa, key=lambda kv: kv[
 # extragem primele 1000 cele mai frecvente cuvinte din toate textele (+ frecventele lor)
 perechi_cuvinte_frecventa = perechi_cuvinte_frecventa[0:PRIMELE_N_CUVINTE]
 
-print("Primele 10 cele mai frecvente cuvinte ", perechi_cuvinte_frecventa[0:10])
+# print("Primele 10 cele mai frecvente cuvinte ", perechi_cuvinte_frecventa[0:10])
 
 
 list_of_selected_words = []
@@ -119,7 +119,7 @@ def get_bow_pe_corpus(corpus, lista):  # face bag of words pentru tot setul de d
             care contine valorile dictionarului
             trebuie convertit in lista apoi in numpy.array
         '''
-        v = np.array(list(bow_dict.values())) # in v avem frecventele
+        v = np.array(list(bow_dict.values()))  # in v avem frecventele
         # incercati si alte tipuri de normalizari
         # v = v / np.sqrt(np.sum(v ** 2))
         # v = v / np.sum(v)
@@ -127,14 +127,38 @@ def get_bow_pe_corpus(corpus, lista):  # face bag of words pentru tot setul de d
     return bow  # va returna o matrice cu 4480 de linii si 10.000 de coloane.
     # pe fiecare linie avem frecventele corespunzatoare celor 1000 de cuvinte, din cele 4480 de texte
 
+'''
+def k_fold_cross_validation(data, k = 10, C = 0.1):
+    # prepare cross validation
+    kfold = KFold(k, True, 1)
+    accuracies = []
+    # enumerate splits
+    for train, test in kfold.split(data):
+        # print('train: %s, test: %s' % (data[train], data[test]))
+        train_fold = np.array(data)[train]
+        test_fold = np.array(data)[test]
+        data_bow_train_fold = get_bow_pe_corpus(train_fold, list_of_selected_words)
+        data_bow_test_fold = get_bow_pe_corpus(test_fold, list_of_selected_words)
+        clasificator_svm = svm.LinearSVC(C=C, dual=False, max_iter=2983)
+        clasificator_svm.fit(data_bow_train_fold, labels[train])  # antrenarea modelului
+        predictions = clasificator_svm.predict(data_bow_test_fold)  # predictiile modelului
+        acc = accuracy(predictions, labels[test])
+        accuracies.append(acc)
+        print("Acuratete pe test fold cu C =", C, ": ", acc)
+    return np.average(accuracies)
+
+
+print('Acuratetea medie in urma k-fold cross validation este ', k_fold_cross_validation(train_data))
+'''
+
 
 #data = train_data + test_data
 data_bow_train = get_bow_pe_corpus(train_data, list_of_selected_words)
 data_bow_test = get_bow_pe_corpus(test_data, list_of_selected_words)
-print("Data bow are shape: ", data_bow_train.shape)
-
+# print("Data bow are shape: ", data_bow_train.shape)
+'''
 nr_exemple_train = 2600
-nr_exemple_valid = 100
+nr_exemple_valid = 200
 nr_exemple_test = len(train_data) - (nr_exemple_train + nr_exemple_valid)
 nr_exemple_test_final = 1497
 
@@ -142,11 +166,11 @@ indici_train = np.arange(0, nr_exemple_train)  # np.array cu valorile [0, 1, 2..
 indici_valid = np.arange(nr_exemple_train, nr_exemple_train + nr_exemple_valid)
 indici_test = np.arange(nr_exemple_train + nr_exemple_valid, len(train_data))
 indici_test_final = np.arange(nr_exemple_train + nr_exemple_valid + nr_exemple_test, len(train_data + test_data))  # [2983 .... 4479]
-print("indici test final: ", indici_test_final)
+# print("indici test final: ", indici_test_final)
 
-print("Histograma cu clasele din train: ", np.histogram(labels[indici_train])[0])
-print("Histograma cu clasele din validation: ", np.histogram(labels[indici_valid])[0])
-print ("Histograma cu clasele din test: ", np.histogram(labels[indici_test])[0])
+# print("Histograma cu clasele din train: ", np.histogram(labels[indici_train])[0])
+# print("Histograma cu clasele din validation: ", np.histogram(labels[indici_valid])[0])
+# print ("Histograma cu clasele din test: ", np.histogram(labels[indici_test])[0])
 # clasele sunt balansate in cazul asta pentru train, valid si nr_exemple_test
 
 
@@ -154,27 +178,28 @@ print ("Histograma cu clasele din test: ", np.histogram(labels[indici_test])[0])
 # https://stats.stackexchange.com/questions/31066/what-is-the-influence-of-c-in-svms-with-linear-kernel
 
 for C in [0.01, 0.1, 1, 10]:
-    # clasificator = svm.SVC(C = C, kernel = 'linear')  # definirea modelului ONE VERSUS ONE
+    # clasificator = svm.SVC(C = C, kernel = 'linear' )  # definirea modelului ONE VERSUS ONE
     clasificator = svm.LinearSVC(C = C, dual = False, max_iter=2983)   # definirea modelului ONE VERSUS ALL
     clasificator.fit(data_bow_train[indici_train, :], labels[indici_train])  # antrenarea modelului
     # fit o sa modifice in clasificator ca sa afle a si b de la ecuatia dreptei
     predictii = clasificator.predict(data_bow_train[indici_valid, :])  # predictiile modelului
     print("Acuratete pe validare cu C =", C, ": ", accuracy(predictii, labels[indici_valid]))
-
+print()
 # concatenam indicii de train si validare
 # incercati diferite valori pentru C si testati pe datele de test
 indici_train_valid = np.concatenate([indici_train, indici_valid])
-# clasificator = svm.SVC(C = 1, kernel = 'linear')
-clasificator = svm.LinearSVC(C = 0.1, dual = False, max_iter=2983)
-clasificator.fit(data_bow_train[indici_train_valid, :], labels[indici_train_valid])
-predictii = clasificator.predict(data_bow_train[indici_test])
-print("Acuratete pe test cu C = 0.1 : ", accuracy(predictii, labels[indici_test]))
-
+for C in [0.01, 0.1, 1, 10]:
+    clasificator = svm.SVC(C = 1, kernel = 'linear')
+    # clasificator = svm.LinearSVC(C = C, dual = False, max_iter=2983)
+    clasificator.fit(data_bow_train[indici_train_valid, :], labels[indici_train_valid])
+    predictii = clasificator.predict(data_bow_train[indici_test])
+    print("Acuratete pe test cu C = ", C, ": ", accuracy(predictii, labels[indici_test]))
+'''
 
 
 ### test final ###
 #clasificator = svm.SVC(C = 1, kernel = 'linear')
-# clasificator = svm.LinearSVC()
+clasificator = svm.LinearSVC(C = 1,  dual = False, max_iter=2983)
 clasificator.fit(data_bow_train, labels)
 predictii_finale = clasificator.predict(data_bow_test)
 
@@ -183,9 +208,10 @@ def scrie_fisier_submission(nume_fisier, predictii, iduri):
     with open(nume_fisier, 'w') as fout:
         fout.write("Id,Prediction\n")
         for id_text, pred in zip(iduri, predictii):
-            fout.write(str(id_text + 1) + ',' + str(int(pred)) + '\n')
+            fout.write(str(id_text) + ',' + str(int(pred)) + '\n')
 
 
+indici_test_final = np.arange(2984, 4481)
 scrie_fisier_submission("submisie_C10.csv", predictii_finale, indici_test_final)
 
 
@@ -232,3 +258,21 @@ print("Acuratete pe test cu gnb: ", accuracy(predictii, labels[indici_test]))
 gnb.fit(data_bow_train, labels)
 predictii_finale = gnb.predict(data_bow_test)
 '''
+
+
+'''
+cea_mai_buna = 'k = 3, distanta = l2'
+M = np.zeros((10, 10))  # M - matricea de confuzie; initial este o matrice cu zero-uri, de dim 10*10
+for pred, adevar in zip(predictii[cea_mai_buna], test_labels):  # construire matrice de confuzie
+    M[adevar, pred] += 1
+print(np.bincount(test_labels))  # de cate ori a aparut fiecare test label
+print("MATRICEA DE CONFUZIE ESTE: ")
+print(M)
+'''
+
+def confusion_matrix(predictii, labels):
+    M = np.zeros(11, 11)
+    for pred, adevar in zip(predictii, labels):
+        M[adevar, pred] += 1
+    return M
+
