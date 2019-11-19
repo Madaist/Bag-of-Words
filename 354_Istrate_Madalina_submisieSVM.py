@@ -3,14 +3,14 @@
 
 import numpy as np
 import os
+import time
 from collections import defaultdict
 from sklearn import svm
 from sklearn.model_selection import KFold
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.naive_bayes import GaussianNB, MultinomialNB
-from sklearn.neural_network import MLPClassifier
 
-PRIMELE_N_CUVINTE = 1000
+total_time = time.time()
+
+PRIMELE_N_CUVINTE = 10000
 
 
 def accuracy(y, p):
@@ -39,10 +39,16 @@ def citeste_texte_din_director(cale):
         iduri_text.append(id_fis)
         with open(fis, 'r', encoding='utf-8') as fin:
             text = fin.read()
-        # text_fara_punct = re.sub("[-.,;:!?\"\'\/()_*=`]", "", text)
         cuvinte_text = text.split()
         date_text.append(cuvinte_text)
     return iduri_text, date_text
+
+
+def scrie_fisier_submission(nume_fisier, predictii, iduri):
+    with open(nume_fisier, 'w') as fout:
+        fout.write("Id,Prediction\n")
+        for id_text, pred in zip(iduri, predictii):
+            fout.write(str(id_text) + ',' + str(int(pred)) + '\n')
 
 
 dir_path = './date_proiect/'
@@ -119,42 +125,40 @@ def confusion_matrix(predictii, labels):
         M[adevar, pred] += 1
     return M
 
-'''
-def k_fold_cross_validation_svm(data, k=10, C=0.1):
-    # prepare cross validation
+
+def k_fold_cross_validation_svm(data, k=10, C=1):
     kfold = KFold(k, True, 1)
     accuracies = []
     final_confusion_matrix = np.zeros((11, 11))
-    # enumerate splits
     for train, test in kfold.split(data):
         train_fold = np.array(data)[train]
         test_fold = np.array(data)[test]
         data_bow_train_fold = get_bow_pe_corpus(train_fold, list_of_selected_words)
         data_bow_test_fold = get_bow_pe_corpus(test_fold, list_of_selected_words)
-        clasificator_svm = svm.LinearSVC(C=C, dual=False, max_iter=2983)
+        clasificator_svm = svm.LinearSVC(C=C, dual=False, max_iter=3000)
+        kfold_train_time = time.time()
         clasificator_svm.fit(data_bow_train_fold, labels[train])  # antrenarea modelului
         predictions = clasificator_svm.predict(data_bow_test_fold)  # predictiile modelului
+        print("Timpul de antrenare pe un fold: %.2f minute" % ((time.time() - kfold_train_time) / 60))
         acc = accuracy(predictions, labels[test])
         accuracies.append(acc)
         print("Acuratete pe test fold cu C =", C, ": ", acc)
-       # print("Matricea de confuzie: ")
         M = confusion_matrix(predictions, labels[test])
-        print(M)
+        # print("Matricea de confuzie: \n", M)
         final_confusion_matrix += M
     return np.average(accuracies), final_confusion_matrix
-'''
-
-#mean_accuracy, conf_matrix = k_fold_cross_validation_svm(train_data)
 
 
-#print('Acuratetea medie in urma k-fold cross validation pe SVM este ', mean_accuracy)
-#print('Matricea de confuzie este: \n', conf_matrix)
+mean_accuracy, conf_matrix = k_fold_cross_validation_svm(train_data)
+
+print('Acuratetea medie in urma k-fold cross validation pe SVM este ', mean_accuracy)
+print('Matricea de confuzie este: \n', conf_matrix)
 
 
 data_bow_train = get_bow_pe_corpus(train_data, list_of_selected_words)
 data_bow_test = get_bow_pe_corpus(test_data, list_of_selected_words)
 
-'''
+"""
 # Varianta cu train + validare + test
 nr_exemple_train = 2500
 nr_exemple_valid = 250
@@ -192,170 +196,24 @@ for C in [0.01, 0.1, 1, 10]:
     clasificator = svm.LinearSVC(C = C, dual = False, max_iter=2983)
     clasificator.fit(data_bow_train[indici_train_valid, :], labels[indici_train_valid])
     predictii = clasificator.predict(data_bow_train[indici_test])
-    print("Acuratete pe test cu C = ", C, ": ", accuracy(predictii, labels[indici_test]))
-'''
+"""
 
-'''
+
 # test final:
-# clasificator = svm.SVC(C = 1, kernel = 'linear')
-clasificator = svm.LinearSVC(C=0.1,  dual=False, max_iter=2983)  # 1 - 88%, 0.1 - 87%
+clasificator = svm.LinearSVC(C= 1,  dual=False, max_iter=2983)
+final_train_time = time.time()
 clasificator.fit(data_bow_train, labels)
 predictii_finale = clasificator.predict(data_bow_test)
-'''
+print("Timpul de antrenare pe testul final: %.2f minute" % ((time.time() - final_train_time) / 60))
 
-'''
-##################### knn ######################
-def k_fold_cross_validation_knn(data, k = 10, vecini = 7):
-    # prepare cross validation
-    kfold = KFold(k, True, 1)
-    accuracies = []
-    # enumerate splits
-    for train, test in kfold.split(data):
-        train_fold = np.array(data)[train]
-        test_fold = np.array(data)[test]
-        data_bow_train_fold = get_bow_pe_corpus(train_fold, list_of_selected_words)
-        data_bow_test_fold = get_bow_pe_corpus(test_fold, list_of_selected_words)
-        clasificator_knn = KNeighborsClassifier(n_neighbors= vecini, p=1)
-        clasificator_knn.fit(data_bow_train_fold, labels[train])  # antrenarea modelului
-        predictions = clasificator_knn.predict(data_bow_test_fold)  # predictiile modelului
-        acc = accuracy(predictions, labels[test])
-        accuracies.append(acc)
-        print("Acuratete pe test fold cu vecini =", vecini, ": ", acc)
-        print("Matricea de confuzie: ")
-        M = confusion_matrix(predictions, labels[test])
-        print(M)
-    return np.average(accuracies)
+indici_test_final = np.arange(2984, 4481)
+scrie_fisier_submission("submisie.csv", predictii_finale, indici_test_final)
 
 
-print('Acuratetea medie in urma k-fold cross validation pe kNN este ', k_fold_cross_validation_knn(train_data))
+print('w = ', clasificator.coef_)
+print('b = ', clasificator.intercept_)
+print("w.shape: ", clasificator.coef_.shape)
+print("b.shape: ", clasificator.intercept_.shape)
 
-# test final:
-clasificator_knn = KNeighborsClassifier(n_neighbors= 7, p = 1)
-clasificator_knn.fit(data_bow_train, labels)
-predictii_finale_knn = clasificator_knn.predict(data_bow_test)
-'''
+print("Timpul de rulare a programului: %.2f minute" % ((time.time() - total_time) / 60))
 
-
-'''
-# VARIANTA CU TRAIN, VALIDARE SI TEST PENTRU kNN
-neigh = KNeighborsClassifier(n_neighbors=7, p = 1)
-neigh.fit(data_bow_train[indici_train, :], labels[indici_train])
-predictii = neigh.predict(data_bow_train[indici_valid, :])
-print("Acuratete pe validare cu knn, k = 7: ", accuracy(predictii, labels[indici_valid]))
-
-# concatenam indicii de train si validare
-indici_train_valid = np.concatenate([indici_train, indici_valid])
-neigh.fit(data_bow_train[indici_train_valid, :], labels[indici_train_valid])
-predictii = neigh.predict(data_bow_train[indici_test])
-print("Acuratete pe test cu knn, k = 7 : ", accuracy(predictii, labels[indici_test]))
-
-# test final:
-neigh.fit(data_bow_train, labels)
-predictii_finale = neigh.predict(data_bow_test)
-'''
-
-'''
-################### NAIVE BAYES ###################
-def k_fold_cross_validation_bayes(data, k = 10):
-    # prepare cross validation
-    kfold = KFold(k, True, 1)
-    accuracies = []
-    # enumerate splits
-    for train, test in kfold.split(data):
-        train_fold = np.array(data)[train]
-        test_fold = np.array(data)[test]
-        data_bow_train_fold = get_bow_pe_corpus(train_fold, list_of_selected_words)
-        data_bow_test_fold = get_bow_pe_corpus(test_fold, list_of_selected_words)
-        clasificator_bayes = MultinomialNB()
-        clasificator_bayes.fit(data_bow_train_fold, labels[train])  # antrenarea modelului
-        predictions = clasificator_bayes.predict(data_bow_test_fold)  # predictiile modelului
-        acc = accuracy(predictions, labels[test])
-        accuracies.append(acc)
-        print("Acuratete pe test fold: ", acc)
-        # print("Matricea de confuzie: ")
-        # M = confusion_matrix(predictions, labels[test])
-        # print(M)
-    return np.average(accuracies)
-
-
-print('Acuratetea medie in urma k-fold cross validation pe Naive Bayes este ', k_fold_cross_validation_bayes(train_data))
-
-### test final ###
-clasificator_bayes = MultinomialNB()
-clasificator_bayes.fit(data_bow_train, labels)
-predictii_finale = clasificator_bayes.predict(data_bow_test)
-'''
-
-
-
-
-'''
-# VARIANTA CU TRAIN, TEST SI VALIDARE PENTRU NAIVE BAYES
-mnb = MultinomialNB()
-mnb.fit(data_bow_train[indici_train, :], labels[indici_train])
-predictii = mnb.predict(data_bow_train[indici_valid, :])
-print("Acuratete pe validare cu mnb: ", accuracy(predictii, labels[indici_valid]))
-
-# concatenam indicii de train si validare
-indici_train_valid = np.concatenate([indici_train, indici_valid])
-mnb.fit(data_bow_train[indici_train_valid, :], labels[indici_train_valid])
-predictii = mnb.predict(data_bow_train[indici_test])
-print("Acuratete pe test cu mnb: ", accuracy(predictii, labels[indici_test]))
-
-### test final ###
-mnb.fit(data_bow_train, labels)
-predictii_finale = mnb.predict(data_bow_test)
-'''
-
-
-def scrie_fisier_submission(nume_fisier, predictii, iduri):
-    with open(nume_fisier, 'w') as fout:
-        fout.write("Id,Prediction\n")
-        for id_text, pred in zip(iduri, predictii):
-            fout.write(str(id_text) + ',' + str(int(pred)) + '\n')
-
-
-#indici_test_final = np.arange(2984, 4481)
-#scrie_fisier_submission("submisie_C10.csv", predictii_finale, indici_test_final)
-
-'''
-TODO pentru a face un submission pe kaggle:
-    1) citesc datele de test si creez data_test_bow dupa modelul de mai sus
-    2) antrenez un clasificator pe toate datele 
-    3) generez predictii pe data_test_bow
-    4) incerc cel putin doua clasificatoare (knn, naive bayes)
-    5) fac matrice de confuzie pentru fiecare clasificator
-    6) fac cross-validare: https://www.youtube.com/watch?v=sFO2ff-gTh0
-    7) citesc cu atentie cerinta proiectului (!!! trebuie si un pdf cu detalii)
-'''
-
-
-def k_fold_cross_validation_mlp(data, k=10):
-    # prepare cross validation
-    kfold = KFold(k, True, 1)
-    accuracies = []
-    final_confusion_matrix = np.zeros((11, 11))
-    # enumerate splits
-    for train, test in kfold.split(data):
-        train_fold = np.array(data)[train]
-        test_fold = np.array(data)[test]
-        data_bow_train_fold = get_bow_pe_corpus(train_fold, list_of_selected_words)
-        data_bow_test_fold = get_bow_pe_corpus(test_fold, list_of_selected_words)
-        clasificator_mlp = MLPClassifier(hidden_layer_sizes = (100,), activation = 'relu', solver='adam', alpha=0.0001, max_iter=10000)
-        clasificator_mlp.fit(data_bow_train_fold, labels[train])  # antrenarea modelului
-        predictions = clasificator_mlp.predict(data_bow_test_fold)  # predictiile modelului
-        acc = accuracy(predictions, labels[test])
-        accuracies.append(acc)
-        print("Acuratete pe test fold cu MLP", acc)
-       # print("Matricea de confuzie: ")
-        M = confusion_matrix(predictions, labels[test])
-        # print(M)
-        final_confusion_matrix += M
-    return np.average(accuracies), final_confusion_matrix
-
-
-mean_accuracy, conf_matrix = k_fold_cross_validation_mlp(train_data)
-
-
-print('Acuratetea medie in urma k-fold cross validation pe MLP este ', mean_accuracy)
-print('Matricea de confuzie este: \n', conf_matrix)
